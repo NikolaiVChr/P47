@@ -313,6 +313,9 @@
 	<guns>
 		<file>Aircraft/P47/Nasal/payloads.nas</file>
 	</guns>
+    <vector>
+        <file>Aircraft/P47/Nasal/vector.nas</file>
+    </vector>
 </nasal>
 
 

@@ -44,36 +44,55 @@ setlistener("/ai/models/model-impact", func {
 	var closest_distance = 10000;
 	var inside_callsign = "";
 	#print("inside listener");
-    if (ballistic != nil) {load_ammo = func{
-    if(getprop("gear/gear/wow")){
-        if(getprop("controls/gear/brake-parking")){
-            setprop("controls/armament/ammo",2800);
-        }
-    }
-}
+    if (ballistic != nil) {
+    	load_ammo = func {
+		    if(getprop("gear/gear/wow")) {
+		        if(getprop("controls/gear/brake-parking")) {
+		            setprop("controls/armament/ammo",2800);
+		        }
+		    }
+		}
 		#print("ballistic isn't nil");
 		var typeNode = ballistic.getNode("impact/type");
 		if (typeNode != nil and typeNode.getValue() != "terrain") {
 			#print("typenode isnt nil");
 			var lat = ballistic.getNode("impact/latitude-deg").getValue();
 			var lon = ballistic.getNode("impact/longitude-deg").getValue();
-			var impactPos = geo.Coord.new().set_latlon(lat, lon);
+			var alt = ballistic.getNode("impact/elevation-m").getValue();
+			var impactPos = geo.Coord.new().set_latlon(lat, lon, alt);
+			var selectionPos = nil;
+			var roll = nil;
+			var pitch = nil;
+			var yaw = nil;
 			foreach(var mp; props.globals.getNode("/ai/models").getChildren("multiplayer")){
 				#print("Gau impact - hit: " ~ typeNode.getValue());
 				var mlat = mp.getNode("position/latitude-deg").getValue();
 				var mlon = mp.getNode("position/longitude-deg").getValue();
 				var malt = mp.getNode("position/altitude-ft").getValue() * FT2M;
-				var selectionPos = geo.Coord.new().set_latlon(mlat, mlon, malt);
+				selectionPos = geo.Coord.new().set_latlon(mlat, mlon, malt);
 				var distance = impactPos.distance_to(selectionPos);
 				#print("distance = " ~ distance);
 				if (distance < closest_distance) {
 					closest_distance = distance;
 					inside_callsign = mp.getNode("callsign").getValue();
+					roll = mp.getNode("orientation/roll-deg").getValue();
+					pitch = mp.getNode("orientation/pitch-deg").getValue();
+					yaw = mp.getNode("orientation/true-heading-deg").getValue();
 				}
 			}
 
 			if ( inside_callsign != "" ) {
 				#we have a successful hit
+				var dist      = selectionPos.direct_distance_to(impactPos);#distance to hit
+				var vectorToHit = vector.Math.eulerToCartesian2(impactPos.course_to(selectionPos), vector.Math.getPitch(impactPos,selectionPos));#vector to hit
+				vectorToHit = vector.Math.normalize(vectorToHit);# unit vector
+				vectorToHit = vector.Math.product(dist, vectorToHit);# get the right length of the vector
+				var localVectorToHit = vector.Math.rollPitchYawVector(-roll, -pitch, yaw, vectorToHit);# reverse the targets attitude
+				localVectorToHit = [-localVectorToHit[0],-localVectorToHit[1],localVectorToHit[2]];# translate back to FG struct. coord. system
+
+				screen.log.write(sprintf("hit (%0.1f,%0.1f,%0.1f)", localVectorToHit[0],localVectorToHit[1],localVectorToHit[2]), 1.0, 1.0, 1.0);
+				print(sprintf("hit (%0.1f,%0.1f,%0.1f)", localVectorToHit[0],localVectorToHit[1],localVectorToHit[2]));
+
 				#print("successful hit");
 				if ( inside_callsign == hit_callsign ) {
 					hit_count = hit_count + 1;
@@ -86,7 +105,7 @@ setlistener("/ai/models/model-impact", func {
 				if ( hit_timer == 0 ) {
 					hit_timer = 1;
 					print("should be going into the timer...");
-					settimer(hitmessage,1);
+					#settimer(hitmessage,1);
 				}
 			}
 		}
